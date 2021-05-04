@@ -1,10 +1,11 @@
 /* eslint-disable */
-import { app, protocol, BrowserWindow, BrowserView } from 'electron'
+import { app, protocol, BrowserWindow } from 'electron'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer'
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
-const {ipcMain} = require("electron")
+const {ipcMain, globalShortcut} = require("electron")
+const { parse } = require('json2csv')
 const db = require('./database')
 
 const Survey = db.survey
@@ -17,6 +18,7 @@ protocol.registerSchemesAsPrivileged([
 let mainWin;
 let mainView;
 let navView;
+var home = 'app://./index.html'
 
 async function createWindow() {
   // Create the browser window.
@@ -31,7 +33,6 @@ async function createWindow() {
       webviewTag: true
     }
   })
-  var home = 'app://./index.html'
   if (process.env.WEBPACK_DEV_SERVER_URL) {
     // Load the url of the dev server if in development mode
     home = process.env.WEBPACK_DEV_SERVER_URL
@@ -75,8 +76,103 @@ app.on('ready', async () => {
   createWindow()
 })
 
+let optionWindow
+async function createOptionWin(){
+  const win = new BrowserWindow({
+    webPreferences: {
+      // Use pluginOptions.nodeIntegration, leave this alone
+      // See nklayman.github.io/vue-cli-plugin-electron-builder/guide/security.html#node-integration for more info
+      nodeIntegration: true,
+      webSecurity: false,
+      webviewTag: true,
+    }
+  })
+  win.setMenuBarVisibility(false)
+  win.loadURL(home+"#/option")
+  optionWindow = await win
+}
+
+app.whenReady().then(() => {
+  protocol.registerFileProtocol('file', (request, callback) => {
+    const pathname = decodeURI(request.url.replace('file:///', ''));
+    callback(pathname);
+  });
+  globalShortcut.register('Alt+CommandOrControl+O', () => {
+    createOptionWin()
+  })
+})
+
+ipcMain.on('get-wall', (event)=>{
+  Survey.db.all(`
+    SELECT * FROM homescreen
+  `, (err, data)=>{
+    if(err) console.log(err)
+    else event.reply('retrive-wall', data)
+  })
+})
+ipcMain.on('get-survey', (evt) => {
+  Survey.db.all(`
+    SELECT * FROM survey
+  `, (err, data) => {
+    if(err) console.log(err)
+    else {
+      data = data.map(e => {
+        e.layanan = e.layanan.split(",").map(e => {
+          return e == 1 ? "Perpustakaan Tercetak" :
+          e == 2 ? "Perpustakaan Digital" :
+          e == 3 ? "Data Mikro" :
+          e == 4 ? "Konsultasi Statistik" :
+          e == 5 ? "Penjualan Softcopy/Hardcopy" : 
+          "Rekomendasi Statistik"
+        }).join(" ,")
+        return e
+      })
+      evt.reply('r-survey', parse(data, {
+        fields: ['id','nama', 'email', 'layanan', 'kepuasan', 'saran']
+      }))
+    }
+  })
+})
+
+
+ipcMain.on('update-wall', (event, paths)=>{
+  let added = false;
+  let deleted = false;
+  if(paths.insert.length == 0){
+    added = true
+  }
+  if(paths.delete.length == 0){
+    deleted = true
+  }
+  if(added && deleted){
+    event.reply("wall-updated")
+  }
+  paths.insert.forEach((e,i,a) => {
+    Survey.insertWallpaper(e)
+    if(i == a.length-1){
+      event.reply("wall-added")
+      added = true
+      if(added && deleted){
+        event.reply("wall-updated")
+        mainWin.reload()
+      }
+    }
+  })
+  paths.delete.forEach((e,i,a) => {
+    Survey.deleteWallpaper(e)
+    if(i == a.length-1){
+      event.reply("wall-removed")
+      deleted = true
+      if(added && deleted){
+        event.reply("wall-updated")
+        mainWin.reload()
+      }
+    }
+  })
+})
+
 ipcMain.on('insert-survey', (evt, data)=>{
-  console.log(data)
+  // console.log(data)
   Survey.insertSurvey(
     {
       nama: data.nama,

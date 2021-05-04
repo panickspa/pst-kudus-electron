@@ -1,9 +1,25 @@
 <template>
   <div class="home">
-    <w-view @loading="showSpinner(true)" @loaded="showSpinner(false)" :src="src" :width="`90vw`" :height="`100vh`"></w-view>
-    <div class="navigation bg-danger pr-2 pl-2">
+    <keep-alive>
+      <router-view></router-view>
+    </keep-alive>
+    <div v-if="$route.path != '/option'" class="navigation bg-danger text-center pr-2 pl-2">
       <b-button 
-        @click="changeSourceUrl(`https://perpustakaan.bps.go.id/digilib/guestbook`)" 
+        @click="changeSourceUrl(`/`)"
+        squared variant="light" 
+        class="menu mb-3"
+      >
+        <div class="d-flex flex-column justify-content-center">
+          <span>
+            <i-house font-scale="3"></i-house>
+          </span>
+          <span>
+            Home
+          </span>
+        </div>
+      </b-button>
+      <b-button 
+        @click="changeSourceUrl(`/perpustakaan`)" 
         squared variant="light" 
         class="menu mb-3">
         <div class="d-flex flex-column justify-content-center">
@@ -25,7 +41,10 @@
           </span>
         </div>
       </b-button>
-      <b-button @click="changeSourceUrl(`https://kuduskab.bps.go.id/`)" squared variant="light" class="menu">Website BPS Kabupaten Kudus</b-button>
+      <b-button @click="changeSourceUrl(`/bpskudus`)" squared variant="light" class="menu">
+        <img style="width: 80%; height: auto;" src="../assets/BPS black.png">
+        <span>Website <br>BPS Kudus</span>
+      </b-button>
     </div>
   </div>
 </template>
@@ -33,16 +52,16 @@
 <script>
 // @ is an alias to /src
 /* eslint-disable */
-import WebView from '@/components/WebView.vue'
 
 export default {
   name: 'Home',
-  components: {
-    'w-view' : WebView
-  },
   methods: {
     changeSourceUrl(evt){
-      this.src=evt
+      if(evt.includes('http')) {
+        this.$store.state.src = evt
+        if(this.$route.path != "/webview") this.$router.push("/webview")
+      }
+      else if(this.$route.path != evt) this.$router.push(evt)
     },
     showSpinner(evt){
       this.spinner = evt
@@ -66,6 +85,7 @@ export default {
     flex-direction: column;
     vertical-align: center;
     justify-content: center;
+    align-items: center;
     width: 12vw;
   }
   .menu{
