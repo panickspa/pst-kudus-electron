@@ -27,7 +27,7 @@
             <i-person font-scale="3"></i-person>
           </span>
           <span>
-            Buku Tamu
+            Buku Tam
           </span>
         </div>
       </b-button>
